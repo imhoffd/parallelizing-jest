@@ -3,7 +3,14 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test-file:
+          - difference.test.js
+          - product.test.js
+          - quotient.test.js
+          - sum.test.js
     steps:
       - uses: actions/checkout@v2
       - run: npm install
-      - run: npx jest
+      - run: npx jest ${{ matrix['test-file'] }}
