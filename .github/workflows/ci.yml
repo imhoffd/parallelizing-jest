@@ -1,16 +1,34 @@
 name: CI
 on: [push]
 jobs:
-  test:
+  setup:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        test-file:
-          - difference.test.js
-          - product.test.js
-          - quotient.test.js
-          - sum.test.js
+    outputs:
+      test-chunks: ${{ steps['set-test-chunks'].outputs['test-chunks'] }}
+      test-chunk-ids: ${{ steps['set-test-chunk-ids'].outputs['test-chunk-ids'] }}
     steps:
       - uses: actions/checkout@v2
       - run: npm install
-      - run: npx jest ${{ matrix['test-file'] }}
+      - id: set-test-chunks
+        name: Set Chunks
+        run: echo "::set-output name=test-chunks::$(npx jest --listTests --json | jq -cM '[_nwise(length / 2 | floor)]')"
+      - id: set-test-chunk-ids
+        name: Set Chunk IDs
+        run: echo "::set-output name=test-chunk-ids::$(echo $CHUNKS | jq -cM 'to_entries | map(.key)')"
+        env:
+          CHUNKS: ${{ steps['set-test-chunks'].outputs['test-chunks'] }}
+  test:
+    runs-on: ubuntu-latest
+    name: test (chunk ${{ matrix.chunk }})
+    needs:
+      - setup
+    strategy:
+      matrix:
+        chunk: ${{ fromJson(needs.setup.outputs['test-chunk-ids']) }}
+    steps:
+      - uses: actions/checkout@v2
+      - run: npm install
+      - name: jest
+        run: echo $CHUNKS | jq '.[${{ matrix.chunk }}] | .[] | @text' | xargs npx jest
+        env:
+          CHUNKS: ${{ needs.setup.outputs['test-chunks'] }}
